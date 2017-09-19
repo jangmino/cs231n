@@ -447,7 +447,7 @@ def conv_backward_naive(dout, cache):
             dpadded_x[:, :,i*stride:i*stride+HH, j*stride:j*stride+WW] += dout[:, :, i, j].dot(flattened_w).reshape(N, C, HH, WW)
 
     print('dout', dout.shape)
-    db = dout.transpose((1, 0, 2, 3)).reshape(2,-1).sum(axis=1)
+    db = dout.transpose((1, 0, 2, 3)).reshape(F,-1).sum(axis=1)
 
     dx = dpadded_x[:, :, pad:-pad, pad:-pad]
     ###########################################################################
@@ -519,27 +519,22 @@ def max_pool_backward_naive(dout, cache):
     H_ = 1 + (H - pool_height) // stride
     W_ = 1 + (W - pool_width) // stride
     _, _, H_, W_ = dout.shape
-    dx = np.zeros(dout.shape)
+    dx = np.zeros(x.shape)
 
-    print('dout', dout.shape)
-    print('dx', dx.shape)
+    #print('dout', dout.shape)
+    #print('dx', dx.shape)
     for i in range(H_):
         for j in range(W_):
-            print('i,j', i, j)
-            max_v = x[:, :, i * stride:i * stride + pool_height, j * stride:j * stride + pool_width].reshape(N, C, -1).max(axis=2)
-            m = np.tile(max_v.reshape(N,C,1,1),[pool_height, pool_width])
-            print(m.shape)
-            print('dout', dout[:, :, i * stride:i * stride + pool_height, j * stride:j * stride + pool_width].shape)
-            ii = dout[:, :, i * stride:i * stride + pool_height, j * stride:j * stride + pool_width] < m
-            temp = dout[:, :, i * stride:i * stride + pool_height, j * stride:j * stride + pool_width].copy()
-            temp[ii] = 0
-            print('ii', ii.shape)
-            print('dout_', temp.shape)
+            #print('i,j', i, j)
+            m = x[:, :, i * stride:i * stride + pool_height, j * stride:j * stride + pool_width].reshape(N*C, -1)
+            do = np.tile(dout[:,:,i,j].reshape(N*C, 1),[1, m.shape[1]])
+            m2 = np.zeros(m.shape)
+            #print('m, m2', m.shape, m2.shape)
+            #print('', m2[np.arange(m.shape[0]), m.argmax(axis=1)].shape)
+            m2[np.arange(m.shape[0]), m.argmax(axis=1)] = dout[:,:,i,j].reshape(N*C,)
 
-            dx[:,:,i * stride:i * stride + pool_height, j * stride:j * stride + pool_width] += temp #dout[:, :, i * stride:i * stride + pool_height, j * stride:j * stride + pool_width][ii]
-
-
-
+            dx[:, :, i * stride:i * stride + pool_height, j * stride:j * stride + pool_width] += \
+                m2.reshape(N,C,pool_height, pool_width)
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
