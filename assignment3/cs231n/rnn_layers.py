@@ -34,7 +34,8 @@ def rnn_step_forward(x, prev_h, Wx, Wh, b):
     # hidden state and any values you need for the backward pass in the next_h   #
     # and cache variables respectively.                                          #
     ##############################################################################
-    pass
+    next_h = np.tanh(np.dot(x, Wx) + np.dot(prev_h, Wh) + b)
+    cache = (x, prev_h, next_h, Wx, Wh)
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################
@@ -63,7 +64,14 @@ def rnn_step_backward(dnext_h, cache):
     # HINT: For the tanh function, you can compute the local derivative in terms #
     # of the output value from tanh.                                             #
     ##############################################################################
-    pass
+    x, prev_h, next_h, Wx, Wh = cache
+    # derivate of tanh(x) = 1 - tanh^2(x) # from http://math2.org/math/derivatives/more/hyperbolics.htm
+    draw_h = (1 - next_h * next_h) * dnext_h
+    db = np.sum(draw_h, axis=0)
+    dWx = np.dot(x.T, draw_h)
+    dWh = np.dot(prev_h.T, draw_h)
+    dx = np.dot(draw_h, Wx.T)
+    dprev_h = np.dot(draw_h, Wh.T)
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################
@@ -88,13 +96,16 @@ def rnn_forward(x, h0, Wx, Wh, b):
     - h: Hidden states for the entire timeseries, of shape (N, T, H).
     - cache: Values needed in the backward pass
     """
-    h, cache = None, None
+    h, cache = None, {}
     ##############################################################################
     # TODO: Implement forward pass for a vanilla RNN running on a sequence of    #
     # input data. You should use the rnn_step_forward function that you defined  #
     # above. You can use a for loop to help compute the forward pass.            #
     ##############################################################################
-    pass
+    N,T,H = x.shape[0], x.shape[1], h0.shape[1]
+    h = np.zeros((N,T,H))
+    for t in range(T):
+        h[:, t, :], cache[t] = rnn_step_forward(x[:,t,:], h0 if t == 0 else h[:,t-1,:], Wx, Wh, b)
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################
@@ -121,7 +132,22 @@ def rnn_backward(dh, cache):
     # sequence of data. You should use the rnn_step_backward function that you   #
     # defined above. You can use a for loop to help compute the backward pass.   #
     ##############################################################################
-    pass
+    N, T, H = dh.shape
+    D = cache[0][0].shape[1]
+
+    dx = np.zeros((N, T, D))
+    dh0 = np.zeros((N, H))
+    dWx = np.zeros((D, H))
+    dWh = np.zeros((H, H))
+    dprev_h = np.zeros((N, H))
+    db = np.zeros(H)
+    for t in reversed(range(T)):
+        total_dh = dh[:,t,:] + dprev_h
+        dx[:,t,:], dprev_h, oWx, oWh, ob = rnn_step_backward(total_dh, cache[t])
+        dWx += oWx
+        dWh += oWh
+        db += ob
+    dh0 = dprev_h
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################
@@ -149,7 +175,7 @@ def word_embedding_forward(x, W):
     #                                                                            #
     # HINT: This can be done in one line using NumPy's array indexing.           #
     ##############################################################################
-    pass
+    out = W[x]
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################
