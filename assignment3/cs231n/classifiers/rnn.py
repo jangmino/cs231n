@@ -143,9 +143,8 @@ class CaptioningRNN(object):
         # 2: Word embedding
         out2, cache2 = word_embedding_forward(captions_in, W_embed)
 
-        # 3: RNN
-        out3, cache3 = rnn_forward(out2, out1, Wx, Wh, b)
-
+        # 3: RNN or LSTM
+        out3, cache3 = rnn_forward(out2, out1, Wx, Wh, b) if self.cell_type == 'rnn' else lstm_forward(out2, out1, Wx, Wh, b)
         # 4: Temporal affine transformation for scoring
         out4, cache4 = temporal_affine_forward(out3, W_vocab, b_vocab)
 
@@ -155,8 +154,8 @@ class CaptioningRNN(object):
         # back 4
         dout3, grads['W_vocab'], grads['b_vocab'] = temporal_affine_backward(dout4, cache4)
 
-        # back 3
-        dout2, dout1, grads['Wx'], grads['Wh'], grads['b'] = rnn_backward(dout3, cache3)
+        # back 3 RNN or LSTM
+        dout2, dout1, grads['Wx'], grads['Wh'], grads['b'] = rnn_backward(dout3, cache3) if self.cell_type == 'rnn' else lstm_backward(dout3, cache3)
 
         # back 2
         grads['W_embed'] = word_embedding_backward(dout2, cache2)
@@ -229,6 +228,7 @@ class CaptioningRNN(object):
         # 0 : Initialize start token
         captions[:,0] = self.word_to_idx['<START>']
         prev_h,_ = affine_forward(features, W_proj, b_proj)
+        prev_c = np.zeros_like(prev_h)
 
         #print('features', features.shape)
         for t in range(1,max_length,1):
@@ -239,8 +239,12 @@ class CaptioningRNN(object):
             #print('x', x.shape)
             #print('W_embed', W_embed.shape)
             #print('captions_', captions[:,t-1,None].shape)
-            # 2 : RNN step forward
-            h,_ = rnn_step_forward(x, prev_h, Wx, Wh, b)
+            # 2 : RNN step forward or LSTM step forward
+            if self.cell_type == 'rnn':
+                h,_ = rnn_step_forward(x, prev_h, Wx, Wh, b)
+            else:
+                h,c,_ = lstm_step_forward(x, prev_h, prev_c, Wx, Wh, b)
+                prev_c = c
             # 3 : Affine transformation
             #print('h', h.shape)
             #print('W_vocab', W_vocab.shape)
